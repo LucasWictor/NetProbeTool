@@ -1,15 +1,44 @@
 ﻿using Infrastructure.Services;
+using System.Diagnostics;
 
 class Program
 {
     static async Task Main(string[] args)
     {
-        // Example of checking command-line arguments
-        if (args.Length > 0 && args[0] == "--start-server")
+        if (args.Length > 0)
         {
-            int port = 8888; // Default port
-            var tcpService = new TcpService(port);
-            await tcpService.StartListeningAsync();
+            switch (args[0])
+            {
+                //Start TCP server
+                case "--start-server":
+                    int tcpPort = 8888; // default TCP port
+                    if (args.Length > 2 && args[1] == "-p" && int.TryParse(args[2], out int parsedTcpPort))
+                    {
+                        tcpPort = parsedTcpPort;
+                    }
+                    var tcpService = new TcpService(tcpPort);
+                    await tcpService.StartListeningAsync();
+                    break;
+
+                //Start UDP server
+                case "--start-udp":
+                    int udpPort = 8888; // default UDP port
+                    if (args.Length > 2 && args[1] == "-p" && int.TryParse(args[2], out int parsedUdpPort))
+                    {
+                        udpPort = parsedUdpPort;
+                    }
+                    var udpService = new UdpService(udpPort);
+                    udpService.StartListening();
+                    break;
+
+                default:
+                    Console.WriteLine("Invalid command. Use '--start-server' for TCP or '--start-udp' for UDP.");
+                    break;
+            }
+        }
+        else
+        {
+            Console.WriteLine("No command provided. Use '--start-server' for TCP or '--start-udp' for UDP.");
         }
     }
 }
