@@ -1,19 +1,16 @@
 ﻿using System;
-using System.Net.Sockets;
 using System.Net;
+using System.Net.Sockets;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace Infrastructure.Services
 {
-    // listen for and accept incoming connection requests
     public class TcpService
     {
-        public delegate void MessageEventHandler(string message);
-        public event MessageEventHandler OnMessage;
-
         private TcpListener listener;
         private int port;
+
+        public event Action<string> OnMessage;
 
         public TcpService(int port)
         {
@@ -21,18 +18,22 @@ namespace Infrastructure.Services
             listener = new TcpListener(IPAddress.Any, port);
         }
 
-        public async Task StartListeningAsync()
+        public async Task StartListeningAsync(CancellationToken cancellationToken)
         {
             listener.Start();
-            OnMessage?.Invoke($"Server is listening on port {port}...");
+            OnMessage?.Invoke("The TCP server is now active on port 8888 and will continue to operate in the background. You can proceed with other tasks while it handles incoming data");
 
             try
             {
-                while (true)
+                while (!cancellationToken.IsCancellationRequested)
                 {
-                    var client = await listener.AcceptTcpClientAsync();
-                    OnMessage?.Invoke("Client Connected.");
-                    HandleClientAsync(client);
+                    if (listener.Pending())
+                    {
+                        var client = await listener.AcceptTcpClientAsync();
+                        OnMessage?.Invoke("Client connected.");
+                        HandleClientAsync(client, cancellationToken);
+                    }
+                    await Task.Delay(100);  // Reduce CPU usage
                 }
             }
             catch (Exception ex)
@@ -45,26 +46,23 @@ namespace Infrastructure.Services
             }
         }
 
-        private async Task HandleClientAsync(TcpClient client)
+        private async Task HandleClientAsync(TcpClient client, CancellationToken cancellationToken)
         {
             using (client)
             {
                 var stream = client.GetStream();
-                var buffer = new byte[1024];
+                byte[] buffer = new byte[1024];
                 try
                 {
-                    while (true)
+                    while (!cancellationToken.IsCancellationRequested)
                     {
-                        int bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length);
-                        if (bytesRead == 0)
-                        {
-                            OnMessage?.Invoke("Client disconnected.");
-                            break;
-                        }
+                        int bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length, cancellationToken);
+                        if (bytesRead == 0) break;
                         var message = Encoding.ASCII.GetString(buffer, 0, bytesRead);
                         OnMessage?.Invoke($"Received: {message}");
 
-                        await stream.WriteAsync(buffer, 0, bytesRead);
+                        // Echo back the message
+                        await stream.WriteAsync(buffer, 0, bytesRead, cancellationToken);
                         OnMessage?.Invoke("Echoed back.");
                     }
                 }
@@ -74,6 +72,5 @@ namespace Infrastructure.Services
                 }
             }
         }
-
     }
 }
