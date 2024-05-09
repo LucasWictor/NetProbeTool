@@ -1,78 +1,74 @@
 ﻿using System;
-using System.Net.Sockets;
 using System.Net;
+using System.Net.Sockets;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace Infrastructure.Services
 {
-    // Provides simple methods that listen for and accept incoming connection requests.
     public class TcpService
     {
         private TcpListener listener;
+        private int port;
+
+        public event Action<string> OnMessage;
 
         public TcpService(int port)
         {
+            this.port = port;
             listener = new TcpListener(IPAddress.Any, port);
         }
 
-        public async Task StartListeningAsync()
+        public async Task StartListeningAsync(CancellationToken cancellationToken)
         {
             listener.Start();
-            Console.WriteLine("Server is listening...");
+            OnMessage?.Invoke("The TCP server is now active on port 8888 and will continue to operate in the background. You can proceed with other tasks while it handles incoming data");
 
             try
             {
-                while (true)
+                while (!cancellationToken.IsCancellationRequested)
                 {
-                    // Returns a task that completes when a client has connected to the server.
-                    var client = await listener.AcceptTcpClientAsync();
-                    Console.WriteLine("Client Connected.");
-                    // It is important to await HandleClientAsync to ensure it runs properly without blocking.
-                    await HandleClientAsync(client);
+                    if (listener.Pending())
+                    {
+                        var client = await listener.AcceptTcpClientAsync();
+                        OnMessage?.Invoke("Client connected.");
+                        HandleClientAsync(client, cancellationToken);
+                    }
+                    await Task.Delay(100);  // Reduce CPU usage
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Server stopped with error: {ex.Message}");
+                OnMessage?.Invoke($"Server stopped with error: {ex.Message}");
             }
             finally
             {
-                // Properly stop the listener when exiting the loop due to an exception or other reason.
                 listener.Stop();
             }
         }
 
-        private async Task HandleClientAsync(TcpClient client)
+        private async Task HandleClientAsync(TcpClient client, CancellationToken cancellationToken)
         {
             using (client)
             {
-                // Retrieves the underlying NetworkStream used to send and receive data.
                 var stream = client.GetStream();
-                var buffer = new byte[1024];
+                byte[] buffer = new byte[1024];
                 try
                 {
-                    while (true)
+                    while (!cancellationToken.IsCancellationRequested)
                     {
-                        int bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length);
-                        if (bytesRead == 0)
-                        {
-                            Console.WriteLine("Client disconnected.");
-                            break;
-                        }
-                        // Converts byte arrays to strings for network stream.
+                        int bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length, cancellationToken);
+                        if (bytesRead == 0) break;
                         var message = Encoding.ASCII.GetString(buffer, 0, bytesRead);
-                        Console.WriteLine("Received: " + message);
+                        OnMessage?.Invoke($"Received: {message}");
 
-                        // Echo the message back to the client
-                        await stream.WriteAsync(buffer, 0, bytesRead);
-                        Console.WriteLine("Echoed back.");
+                        // Echo back the message
+                        await stream.WriteAsync(buffer, 0, bytesRead, cancellationToken);
+                        OnMessage?.Invoke("Echoed back.");
                     }
                 }
                 catch (Exception ex)
                 {
-                    // Catch exceptions that may occur during the reading/writing from the stream.
-                    Console.WriteLine($"Error during communication: {ex.Message}");
+                    OnMessage?.Invoke($"Error during communication: {ex.Message}");
                 }
             }
         }
