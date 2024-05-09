@@ -1,44 +1,120 @@
-﻿using Infrastructure.Services;
-using System.Diagnostics;
+﻿using Infrastructure.Services;  
 
 class Program
 {
-    static async Task Main(string[] args)
+    private static TcpService tcpService = null;  
+    private static UdpService udpService = null; 
+
+    private static async Task Main(string[] args)
     {
-        if (args.Length > 0)
+        CancellationTokenSource cts = new CancellationTokenSource();
+        bool running = true;
+
+        while (running)
         {
-            switch (args[0])
+            Console.Clear();
+            Console.WriteLine("Select an option:");
+            Console.WriteLine("1. Start TCP Server");
+            Console.WriteLine("2. Start UDP Server");
+            Console.WriteLine("3. Port Scanning Menu");
+            Console.WriteLine("4. Exit");
+
+            var key = Console.ReadKey().Key;
+            Console.Clear();  
+
+            switch (key)
             {
-                //Start TCP server
-                case "--start-server":
-                    int tcpPort = 8888; // default TCP port
-                    if (args.Length > 2 && args[1] == "-p" && int.TryParse(args[2], out int parsedTcpPort))
+                case ConsoleKey.D1:
+                    if (tcpService == null)
                     {
-                        tcpPort = parsedTcpPort;
+                        tcpService = new TcpService(8888);
+                        tcpService.OnMessage += Console.WriteLine;  // Subscribe to TCP server messages
+                        StartTcpServer(tcpService, cts.Token);
                     }
-                    var tcpService = new TcpService(tcpPort);
-                    await tcpService.StartListeningAsync();
-                    break;
-
-                //Start UDP server
-                case "--start-udp":
-                    int udpPort = 8888; // default UDP port
-                    if (args.Length > 2 && args[1] == "-p" && int.TryParse(args[2], out int parsedUdpPort))
+                    else
                     {
-                        udpPort = parsedUdpPort;
+                        Console.WriteLine("TCP server is already running.");
                     }
-                    var udpService = new UdpService(udpPort);
-                    udpService.StartListening();
                     break;
-
+                case ConsoleKey.D2:
+                    if (udpService == null)
+                    {
+                        udpService = new UdpService(8888);
+                        udpService.StartListening();
+                        Console.WriteLine("The UDP server is now active on port 8888 and will continue to operate in the background. You can proceed with other tasks while it handles incoming data");
+                    }
+                    else
+                    {
+                        Console.WriteLine("UDP server is already running.");
+                    }
+                    break;
+                case ConsoleKey.D3:
+                    await PortScanningMenu();
+                    break;
+                case ConsoleKey.D4:
+                    cts.Cancel(); 
+                    running = false;
+                    break;
                 default:
-                    Console.WriteLine("Invalid command. Use '--start-server' for TCP or '--start-udp' for UDP.");
+                    Console.WriteLine("Invalid option, try again.");
                     break;
             }
+
+            if (running)
+            {
+                Console.WriteLine("\nPress any key to return to the main menu...");
+                Console.ReadKey();
+            }
+        }
+    }
+
+    private static void StartTcpServer(TcpService service, CancellationToken token)
+    {
+        Task.Run(() => service.StartListeningAsync(token), token);
+    }
+
+    private static async Task PortScanningMenu()
+    {
+        Console.WriteLine("Choose an option for port scanning:");
+        Console.WriteLine("1. Localhost");
+        Console.WriteLine("2. External IP Address");
+
+        var key = Console.ReadKey().Key;
+        Console.Clear();
+
+        switch (key)
+        {
+            case ConsoleKey.D1:
+                await ScanPorts("127.0.0.1");
+                break;
+            case ConsoleKey.D2:
+                Console.Write("Enter the IP address to scan: ");
+                string ip = Console.ReadLine();
+                await ScanPorts(ip);
+                break;
+            default:
+                Console.WriteLine("Invalid choice. Returning to main menu.");
+                break;
+        }
+    }
+
+    private static async Task ScanPorts(string ipAddress)
+    {
+        Console.Write("Enter the start and end ports to scan (e.g., 80 100): ");
+        string[] ports = Console.ReadLine().Split(' ');
+        if (ports.Length == 2 && int.TryParse(ports[0], out int start) && int.TryParse(ports[1], out int end))
+        {
+            PortScanner scanner = new PortScanner();
+            Console.WriteLine($"Scanning ports {start} to {end} on {ipAddress}...");
+            await scanner.ScanPorts(ipAddress, start, end);
+            Console.WriteLine("Scanning complete.");
         }
         else
         {
-            Console.WriteLine("No command provided. Use '--start-server' for TCP or '--start-udp' for UDP.");
+            Console.WriteLine("Invalid ports entered.");
         }
+
+        Console.WriteLine("Press any key to continue...");
+        Console.ReadKey(); 
     }
 }
