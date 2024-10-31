@@ -61,7 +61,7 @@ namespace Infrastructure.Services
                         var message = Encoding.ASCII.GetString(buffer, 0, bytesRead);
                         OnMessage?.Invoke($"Received: {message}");
 
-                        // Echo back the message
+                        // echo back the message
                         await stream.WriteAsync(buffer, 0, bytesRead, cancellationToken);
                         OnMessage?.Invoke("Echoed back.");
                     }
