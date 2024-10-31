@@ -34,7 +34,7 @@ using System.Threading.Tasks;
                 results.Add(result);
             }
 
-            // Sort by port number before printing
+            // Sort by port number before print
             foreach (var result in results.OrderBy(r => r.Port))
             {
                 Console.WriteLine(result.Status);
