@@ -21,7 +21,7 @@ namespace Infrastructure.Utilities
             for (int i = 0; i < dataLength; i += bytesPerLine)
             {
                 // Offset
-                sb.Append($"{i:X8}  "); // Offset in hexadecimal (8 characters wide)
+                sb.Append($"{i:X8}  ");
 
                 // Hexadecimal Representation
                 for (int j = 0; j < bytesPerLine; j++)
@@ -32,15 +32,13 @@ namespace Infrastructure.Utilities
                         sb.Append("   "); 
                 }
 
-                sb.Append(" "); 
-
-                // ASCII Representation
+                sb.Append(" ");
+                
                 for (int j = 0; j < bytesPerLine; j++)
                 {
                     if (i + j < dataLength)
                     {
                         var ch = data[i + j];
-                        // Printable ASCII range 32-126; otherwise, use '.'
                         sb.Append(ch >= 32 && ch <= 126 ? (char)ch : '.');
                     }
                     else

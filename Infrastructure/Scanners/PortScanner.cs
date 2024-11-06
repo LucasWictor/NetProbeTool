@@ -28,7 +28,6 @@ using System.Threading.Tasks;
 
             var scanResults = await Task.WhenAll(tasks);
 
-            // Add results synchronized
             foreach (var result in scanResults)
             {
                 results.Add(result);
