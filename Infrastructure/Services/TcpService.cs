@@ -1,14 +1,14 @@
-﻿using System;
-using System.Net;
+﻿using System.Net;
 using System.Net.Sockets;
 using System.Text;
+
 
 namespace Infrastructure.Services
 {
     public class TcpService
     {
-        private TcpListener listener;
-        private int port;
+        private readonly TcpListener listener;
+        private readonly int port;
 
         public event Action<string> OnMessage;
 
@@ -21,7 +21,7 @@ namespace Infrastructure.Services
         public async Task StartListeningAsync(CancellationToken cancellationToken)
         {
             listener.Start();
-            OnMessage?.Invoke("The TCP server is now active on port 8888 and will continue to operate in the background. You can proceed with other tasks while it handles incoming data");
+            OnMessage?.Invoke($"TCP server listening on port {port}");
 
             try
             {
@@ -31,10 +31,14 @@ namespace Infrastructure.Services
                     {
                         var client = await listener.AcceptTcpClientAsync();
                         OnMessage?.Invoke("Client connected.");
-                        HandleClientAsync(client, cancellationToken);
+                        _ = HandleClientAsync(client, cancellationToken);
                     }
-                    await Task.Delay(100);  // Reduce CPU usage
+                    await Task.Delay(100, cancellationToken);  // delay to lower CPU usage
                 }
+            }
+            catch (OperationCanceledException)
+            {
+                OnMessage?.Invoke("TCP listening cancelled.");
             }
             catch (Exception ex)
             {
@@ -43,6 +47,7 @@ namespace Infrastructure.Services
             finally
             {
                 listener.Stop();
+                OnMessage?.Invoke("Server stopped.");
             }
         }
 
@@ -52,19 +57,25 @@ namespace Infrastructure.Services
             {
                 var stream = client.GetStream();
                 byte[] buffer = new byte[1024];
+
                 try
                 {
                     while (!cancellationToken.IsCancellationRequested)
                     {
                         int bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length, cancellationToken);
                         if (bytesRead == 0) break;
-                        var message = Encoding.ASCII.GetString(buffer, 0, bytesRead);
+
+                        string message = Encoding.ASCII.GetString(buffer, 0, bytesRead);
                         OnMessage?.Invoke($"Received: {message}");
 
-                        // echo back the message
+                        // Echo back the message
                         await stream.WriteAsync(buffer, 0, bytesRead, cancellationToken);
                         OnMessage?.Invoke("Echoed back.");
                     }
+                }
+                catch (SocketException ex) when (ex.SocketErrorCode == SocketError.ConnectionReset)
+                {
+                    OnMessage?.Invoke("Connection reset by client.");
                 }
                 catch (Exception ex)
                 {
