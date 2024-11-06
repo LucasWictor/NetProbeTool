@@ -1,9 +1,12 @@
-﻿using Infrastructure.Services;  
+﻿using System;
+using System.Threading;
+using System.Threading.Tasks;
+using Infrastructure.Services;
 
 class Program
 {
-    private static TcpService tcpService = null;  
-    private static UdpService udpService = null; 
+    private static TcpService tcpService = null;
+    private static UdpService udpService = null;
 
     private static async Task Main(string[] args)
     {
@@ -20,7 +23,7 @@ class Program
             Console.WriteLine("4. Exit");
 
             var key = Console.ReadKey().Key;
-            Console.Clear();  
+            Console.Clear();
 
             switch (key)
             {
@@ -40,8 +43,8 @@ class Program
                     if (udpService == null)
                     {
                         udpService = new UdpService(8888);
-                        udpService.StartListening();
-                        Console.WriteLine("The UDP server is now active on port 8888 and will continue to operate in the background. You can proceed with other tasks while it handles incoming data");
+                        udpService.StartListeningAsync(cts.Token);
+                        Console.WriteLine("The UDP server is now active on port 8888 and will continue to operate in the background.");
                     }
                     else
                     {
@@ -115,6 +118,6 @@ class Program
         }
 
         Console.WriteLine("Press any key to continue...");
-        Console.ReadKey(); 
+        Console.ReadKey();
     }
 }
